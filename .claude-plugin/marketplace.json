@@ -1,0 +1,17 @@
+{
+  "name": "xugongzi-toolkit",
+  "owner": {
+    "name": "许公子"
+  },
+  "metadata": {
+    "description": "许公子工具包：抖音内容创作者工作流 Claude Code 插件集合"
+  },
+  "plugins": [
+    {
+      "name": "xugongzi-lite",
+      "source": "./",
+      "description": "精简版：4 条命令搞定抖音内容创作核心流程（灵感提取 / 对标拆解 / 抓整个号 / 任务状态）",
+      "version": "0.1.0"
+    }
+  ]
+}

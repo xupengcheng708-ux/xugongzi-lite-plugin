@@ -1,0 +1,49 @@
+{
+  "name": "xugongzi-lite",
+  "version": "0.1.0",
+  "description": "许公子工具包精简版：4 条命令搞定抖音内容创作者核心工作流。灵感提取 / 对标拆解 / 抓整个号 / 任务状态。",
+  "author": {
+    "name": "许公子"
+  },
+  "keywords": ["douyin", "抖音", "内容创作", "灵感", "对标拆解"],
+  "license": "MIT",
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "工作路线",
+      "description": "a = 满血版（Apple Silicon Mac 专属，转写快 3-5 倍，主页可按点赞/评论筛选）；b = 通用版（跨平台，推荐新手）",
+      "enum": ["a", "b"],
+      "default": "b"
+    },
+    "inspiration_dir": {
+      "type": "directory",
+      "title": "灵感池目录",
+      "description": "/灵感提取 命令产出的 md 文件存到这里",
+      "required": true
+    },
+    "review_dir": {
+      "type": "directory",
+      "title": "拆解池目录",
+      "description": "/对标拆解 命令产出的 md 文件存到这里",
+      "required": true
+    },
+    "account_dir": {
+      "type": "directory",
+      "title": "抓账号目录",
+      "description": "/抓整个号 命令批量抓取的账号归档到这里（每个账号一个子目录）",
+      "required": true
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/lib/session_start.sh '${user_config.mode}' '${user_config.inspiration_dir}' '${user_config.review_dir}' '${user_config.account_dir}'"
+          }
+        ]
+      }
+    ]
+  }
+}
