@@ -1,0 +1,58 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "xugongzi-toolkit",
+  "title": "许公子工具包",
+  "description": "抖音内容创作者工具包：灵感提取 / 对标拆解 / 抓整个号 / 任务状态",
+  "icon": "extension-icon.png",
+  "author": "xugongzi",
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "extract-inspiration",
+      "title": "灵感提取",
+      "subtitle": "单条 URL → 灵感池",
+      "description": "粘贴抖音/小红书/B站/YouTube 视频链接，自动下载转录，存到你配置的灵感池",
+      "mode": "view"
+    },
+    {
+      "name": "extract-benchmark",
+      "title": "对标拆解",
+      "subtitle": "单条 URL → 拆解池",
+      "description": "对标视频下载转录 + 存到拆解池，分析在 Claude Code 里跑",
+      "mode": "view"
+    },
+    {
+      "name": "scrape-account",
+      "title": "抓整个号",
+      "subtitle": "主页 URL → 批量入库",
+      "description": "粘贴抖音主页链接，列作品 → 勾选 → 批量下载转录归档",
+      "mode": "view"
+    },
+    {
+      "name": "view-tasks",
+      "title": "任务状态",
+      "subtitle": "查看后台任务进度",
+      "description": "查看下载/转录后台任务的实时状态",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.85.0",
+    "@raycast/utils": "^1.18.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.14",
+    "eslint": "^8.57.0",
+    "prettier": "^3.4.1",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint"
+  }
+}
