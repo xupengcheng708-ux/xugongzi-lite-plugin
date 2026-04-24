@@ -1,11 +1,11 @@
 #!/bin/bash
 # 许公子工具包 · 一键安装脚本
 # 用法（学员直接粘到终端跑）:
-#   curl -fsSL https://raw.githubusercontent.com/xupengcheng/xugongzi-lite-plugin/main/quick-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/xupengcheng708-ux/xugongzi-lite-plugin/main/quick-install.sh | bash
 
 set -euo pipefail
 
-REPO_URL="https://github.com/xupengcheng/xugongzi-lite-plugin.git"
+REPO_URL="https://github.com/xupengcheng708-ux/xugongzi-lite-plugin.git"
 PLUGIN_DIR="$HOME/.claude/plugins/xugongzi-lite"
 CLAUDE_PLUGINS="$HOME/.claude/plugins"
 

@@ -22,7 +22,7 @@ Claude Code Plugin。4 条命令搞定抖音内容创作者核心工作流：
 **第 1 条**：添加 marketplace
 
 ```
-/plugin marketplace add github:xupengcheng/xugongzi-lite-plugin
+/plugin marketplace add github:xupengcheng708-ux/xugongzi-lite-plugin
 ```
 
 **第 2 条**：装 plugin
@@ -142,7 +142,7 @@ A:
 万一 Claude Code 的 marketplace 机制有问题，还有终端 fallback：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xupengcheng/xugongzi-lite-plugin/main/quick-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/xupengcheng708-ux/xugongzi-lite-plugin/main/quick-install.sh | bash
 ```
 
 优先用 plugin marketplace 方式（官方机制、支持 `/plugin update`）。
@@ -151,4 +151,4 @@ curl -fsSL https://raw.githubusercontent.com/xupengcheng/xugongzi-lite-plugin/ma
 
 ## 许可
 
-MIT · [许公子](https://github.com/xupengcheng)
+MIT · [许公子](https://github.com/xupengcheng708-ux)
