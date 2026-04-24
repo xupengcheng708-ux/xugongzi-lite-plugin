@@ -8,6 +8,8 @@ import {
 } from "@raycast/api";
 import { useState } from "react";
 import { spawn } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import {
   loadConfig,
   inspirationScript,
@@ -18,11 +20,16 @@ import {
 
 type FormValues = {
   url: string;
+  account: string;
+  language: string;
+  note: string;
+  keepMedia: boolean;
 };
 
 export default function Command() {
   const [loading, setLoading] = useState(false);
   const [urlError, setUrlError] = useState<string | undefined>();
+  const [accountError, setAccountError] = useState<string | undefined>();
 
   async function handleSubmit(values: FormValues) {
     const cfg = loadConfig();
@@ -35,27 +42,47 @@ export default function Command() {
       return;
     }
 
+    let hasError = false;
     const url = extractUrl(values.url);
     if (!url) {
       setUrlError("没识别出视频链接");
-      return;
+      hasError = true;
     }
+    if (!values.account.trim()) {
+      setAccountError("请输入对标账号名");
+      hasError = true;
+    }
+    if (hasError) return;
+
     setUrlError(undefined);
+    setAccountError(undefined);
     setLoading(true);
 
     try {
-      const taskId = await createTask("对标拆解-抽文案", url);
-      // 对标拆解：--target-dir 指向 review_dir
-      launchBackground(inspirationScript(cfg.mode), [
-        taskId,
-        url,
-        `--target-dir=${cfg.review_dir}`,
-      ]);
+      // 按账号名建子目录：review_dir/{账号}/
+      const accountDir = path.join(
+        cfg.review_dir,
+        sanitizeAccountName(values.account.trim()),
+      );
+      fs.mkdirSync(accountDir, { recursive: true });
+
+      const taskId = await createTask("对标拆解-抽文案", url!);
+      const args: string[] = [taskId, url!, `--target-dir=${accountDir}`];
+      if (values.language) {
+        args.push(`--language=${values.language}`);
+      }
+      if (values.note && values.note.trim()) {
+        args.push(`--note=${values.note.trim()}`);
+      }
+      if (values.keepMedia) {
+        args.push("--keep-media");
+      }
+      launchBackground(inspirationScript(cfg.mode), args);
 
       await showToast({
         style: Toast.Style.Success,
         title: "✅ 已启动",
-        message: `任务 ${taskId} · 文案完后去 Claude Code 说「对标拆解 <md路径>」跑分析`,
+        message: `${values.account} · 任务 ${taskId}`,
       });
       setTimeout(() => popToRoot(), 400);
     } catch (err) {
@@ -74,14 +101,11 @@ export default function Command() {
       isLoading={loading}
       actions={
         <ActionPanel>
-          <Action.SubmitForm
-            title="开始拆解（抽文案）"
-            onSubmit={handleSubmit}
-          />
+          <Action.SubmitForm title="开始拆解" onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
-      <Form.Description text="对标视频 → 下载转录 → 存拆解池。要跑钩子/结构/金句分析：去 Claude Code 说「对标拆解 <生成的 md 路径>」" />
+      <Form.Description text="对标账号的视频 → 深度拆解池。文案抽取在 Raycast 完成，钩子/结构/金句分析去 Claude Code 说「对标拆解 <md>」" />
       <Form.TextField
         id="url"
         title="视频链接"
@@ -89,8 +113,37 @@ export default function Command() {
         error={urlError}
         onChange={() => urlError && setUrlError(undefined)}
       />
+      <Form.TextField
+        id="account"
+        title="对标账号"
+        placeholder="例：清华白也"
+        info="会建立 拆解池/{这个名字}/ 目录存放此账号的所有拆解"
+        error={accountError}
+        onChange={() => accountError && setAccountError(undefined)}
+      />
+      <Form.Dropdown id="language" title="转录语言" defaultValue="zh">
+        <Form.Dropdown.Item value="zh" title="中文" />
+        <Form.Dropdown.Item value="en" title="英文" />
+        <Form.Dropdown.Item value="auto" title="自动检测" />
+      </Form.Dropdown>
+      <Form.TextArea
+        id="note"
+        title="备注（可选）"
+        placeholder="为什么拆这条？学什么点？"
+      />
+      <Form.Separator />
+      <Form.Checkbox
+        id="keepMedia"
+        label="保留视频文件到本地"
+        defaultValue={false}
+        info="默认关：转录完自动删视频，只留文案"
+      />
     </Form>
   );
+}
+
+function sanitizeAccountName(s: string): string {
+  return s.replace(/[/\\:*?"<>|\n\r#^[\]]/g, "_").trim();
 }
 
 function createTask(type: string, args: string): Promise<string> {

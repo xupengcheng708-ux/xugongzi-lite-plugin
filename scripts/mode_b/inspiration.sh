@@ -1,6 +1,6 @@
 #!/bin/bash
 # mode_b/inspiration.sh - 单条视频下载+转写（路线 B：yt-dlp + openai-whisper）
-# 用法: inspiration.sh <TASK_ID> <URL> [--target-dir <path>]
+# 用法: inspiration.sh <TASK_ID> <URL> [--target-dir <path>] [--language zh|en|auto] [--note "..."] [--keep-media]
 
 set -euo pipefail
 export PATH="$HOME/bin:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
@@ -16,10 +16,18 @@ URL="$2"
 shift 2
 
 TARGET_DIR=""
+LANGUAGE="zh"
+NOTE=""
+KEEP_MEDIA=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --target-dir=*) TARGET_DIR="${1#*=}"; shift ;;
         --target-dir)   TARGET_DIR="$2"; shift 2 ;;
+        --language=*)   LANGUAGE="${1#*=}"; shift ;;
+        --language)     LANGUAGE="$2"; shift 2 ;;
+        --note=*)       NOTE="${1#*=}"; shift ;;
+        --note)         NOTE="$2"; shift 2 ;;
+        --keep-media)   KEEP_MEDIA=1; shift ;;
         *) shift ;;
     esac
 done
@@ -46,10 +54,15 @@ bash "$TASK_LOG" update "$TASK_ID" running "10"
 
 TMPDIR=$(mktemp -d -t xgz_insp_XXXXXX)
 
-# Step 2: 尝试抓字幕
-log "尝试下载字幕..."
+# Step 2: 尝试抓字幕（按 language 选 sub-lang）
+case "$LANGUAGE" in
+    en)   SUB_LANG="en,en-US" ;;
+    auto) SUB_LANG="zh-Hans,zh-CN,zh,en,en-US" ;;
+    *)    SUB_LANG="zh-Hans,zh-CN,zh" ;;
+esac
+log "尝试下载字幕（lang=$LANGUAGE）..."
 yt-dlp --write-subs --write-auto-subs \
-    --sub-lang "zh-Hans,zh-CN,zh,en" \
+    --sub-lang "$SUB_LANG" \
     --skip-download --convert-subs srt \
     -o "$TMPDIR/video" "$URL" 2>&1 | tee -a "$LOG_FILE" >/dev/null || true
 
@@ -70,9 +83,13 @@ else
     [[ ! -f "$VIDEO_FILE" ]] && fail "下载后找不到 mp4"
 
     bash "$TASK_LOG" update "$TASK_ID" running "50"
-    log "openai-whisper 转写（base 模型 ≈ 1x 实时）..."
+    log "openai-whisper 转写（base 模型 ≈ 1x 实时，lang=$LANGUAGE）..."
 
-    python3 -m whisper "$VIDEO_FILE" --language zh --model base \
+    WHISPER_LANG_ARGS=""
+    if [[ "$LANGUAGE" != "auto" ]]; then
+        WHISPER_LANG_ARGS="--language $LANGUAGE"
+    fi
+    python3 -m whisper "$VIDEO_FILE" $WHISPER_LANG_ARGS --model base \
         --output_format srt --output_dir "$TMPDIR" \
         2>&1 | tee -a "$LOG_FILE" >/dev/null || fail "whisper 转写失败"
 
@@ -98,6 +115,13 @@ log "格式化文案..."
 FORMATTED=$(python3 "$FORMAT_SRT" "$SRT_FILE" 2>/dev/null || cat "$SRT_FILE")
 
 mkdir -p "$TARGET_DIR"
+
+# 生成 md，note 非空则加 "## 备注" 段
+NOTE_SECTION=""
+if [[ -n "$NOTE" ]]; then
+    NOTE_SECTION=$'\n## 📝 备注\n\n'"$NOTE"$'\n'
+fi
+
 cat > "$OUT_FILE" <<EOF
 ---
 标题: $TITLE
@@ -110,7 +134,7 @@ cat > "$OUT_FILE" <<EOF
 ---
 
 # $TITLE
-
+$NOTE_SECTION
 ## 📄 原始文案
 
 $FORMATTED
@@ -119,6 +143,11 @@ EOF
 log "✓ 写入 $OUT_FILE"
 bash "$TASK_LOG" update "$TASK_ID" done "100"
 
-rm -rf "$TMPDIR"
+# KEEP_MEDIA=1 时保留 TMPDIR（含视频）；否则清理
+if [[ "$KEEP_MEDIA" == "1" ]]; then
+    log "视频保留在 $TMPDIR/"
+else
+    rm -rf "$TMPDIR"
+fi
 trap - ERR
 log "任务完成"

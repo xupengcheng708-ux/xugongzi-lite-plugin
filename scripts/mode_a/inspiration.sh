@@ -1,6 +1,6 @@
 #!/bin/bash
 # mode_a/inspiration.sh - 单条视频下载+转写（路线 A：douyin-toolkit + mlx_whisper）
-# 用法: inspiration.sh <TASK_ID> <URL> [--target-dir <path>]
+# 用法: inspiration.sh <TASK_ID> <URL> [--target-dir <path>] [--language zh|en|auto] [--note "..."] [--keep-media]
 
 set -euo pipefail
 export PATH="$HOME/bin:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
@@ -19,10 +19,18 @@ URL="$2"
 shift 2
 
 TARGET_DIR=""
+LANGUAGE="zh"
+NOTE=""
+KEEP_MEDIA=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --target-dir=*) TARGET_DIR="${1#*=}"; shift ;;
         --target-dir)   TARGET_DIR="$2"; shift 2 ;;
+        --language=*)   LANGUAGE="${1#*=}"; shift ;;
+        --language)     LANGUAGE="$2"; shift 2 ;;
+        --note=*)       NOTE="${1#*=}"; shift ;;
+        --note)         NOTE="$2"; shift 2 ;;
+        --keep-media)   KEEP_MEDIA=1; shift ;;
         *) shift ;;
     esac
 done
@@ -69,9 +77,14 @@ if [[ "$PLATFORM" == "抖音" ]]; then
     [[ ! -f "$VIDEO_FILE" ]] && fail "mp4 找不到: $VIDEO_FILE"
     METHOD="whisper"
 else
-    # 其他平台走 yt-dlp 字幕 → 视频（跟 mode_b 一样）
-    log "尝试抓字幕..."
-    yt-dlp --write-subs --write-auto-subs --sub-lang "zh-Hans,zh-CN,zh,en" \
+    # 其他平台走 yt-dlp 字幕 → 视频
+    case "$LANGUAGE" in
+        en)   SUB_LANG="en,en-US" ;;
+        auto) SUB_LANG="zh-Hans,zh-CN,zh,en,en-US" ;;
+        *)    SUB_LANG="zh-Hans,zh-CN,zh" ;;
+    esac
+    log "尝试抓字幕（lang=$LANGUAGE）..."
+    yt-dlp --write-subs --write-auto-subs --sub-lang "$SUB_LANG" \
         --skip-download --convert-subs srt -o "$TMPDIR/video" "$URL" 2>&1 | tee -a "$LOG_FILE" >/dev/null || true
 
     SRT_FILE=$(find "$TMPDIR" -name "*.srt" 2>/dev/null | head -1)
@@ -95,10 +108,14 @@ bash "$TASK_LOG" update "$TASK_ID" running "50"
 # 如果没有字幕，跑 mlx_whisper
 if [[ -z "$SRT_FILE" ]]; then
     command -v mlx_whisper >/dev/null || fail "mlx_whisper 未安装。pip3 install mlx-whisper"
-    log "mlx_whisper 转写（large-v3-turbo）..."
+    log "mlx_whisper 转写（large-v3-turbo，lang=$LANGUAGE）..."
 
+    MLX_LANG_ARGS=""
+    if [[ "$LANGUAGE" != "auto" ]]; then
+        MLX_LANG_ARGS="--language $LANGUAGE"
+    fi
     mlx_whisper "$VIDEO_FILE" --model mlx-community/whisper-large-v3-turbo \
-        --output-format srt --output-dir "$TMPDIR" --language zh \
+        --output-format srt --output-dir "$TMPDIR" $MLX_LANG_ARGS \
         2>&1 | tee -a "$LOG_FILE" >/dev/null || fail "mlx_whisper 失败"
 
     SRT_FILE=$(find "$TMPDIR" -name "*.srt" | head -1)
@@ -116,6 +133,12 @@ OUT_FILE="$TARGET_DIR/${DATE}-${SAFE_TITLE}.md"
 FORMATTED=$(python3 "$FORMAT_SRT" "$SRT_FILE" 2>/dev/null || cat "$SRT_FILE")
 
 mkdir -p "$TARGET_DIR"
+
+NOTE_SECTION=""
+if [[ -n "$NOTE" ]]; then
+    NOTE_SECTION=$'\n## 📝 备注\n\n'"$NOTE"$'\n'
+fi
+
 cat > "$OUT_FILE" <<EOF
 ---
 标题: $TITLE
@@ -128,7 +151,7 @@ cat > "$OUT_FILE" <<EOF
 ---
 
 # $TITLE
-
+$NOTE_SECTION
 ## 📄 原始文案
 
 $FORMATTED
@@ -137,6 +160,10 @@ EOF
 log "✓ 写入 $OUT_FILE"
 bash "$TASK_LOG" update "$TASK_ID" done "100"
 
-rm -rf "$TMPDIR"
+if [[ "$KEEP_MEDIA" == "1" ]]; then
+    log "视频保留在 $TMPDIR/"
+else
+    rm -rf "$TMPDIR"
+fi
 trap - ERR
 log "任务完成"

@@ -18,6 +18,9 @@ import {
 
 type FormValues = {
   url: string;
+  language: string;
+  note: string;
+  keepMedia: boolean;
 };
 
 export default function Command() {
@@ -45,12 +48,22 @@ export default function Command() {
 
     try {
       const taskId = await createTask("灵感提取", url);
-      launchBackground(inspirationScript(cfg.mode), [taskId, url]);
+      const args: string[] = [taskId, url];
+      if (values.language) {
+        args.push(`--language=${values.language}`);
+      }
+      if (values.note && values.note.trim()) {
+        args.push(`--note=${values.note.trim()}`);
+      }
+      if (values.keepMedia) {
+        args.push("--keep-media");
+      }
+      launchBackground(inspirationScript(cfg.mode), args);
 
       await showToast({
         style: Toast.Style.Success,
         title: "✅ 已启动",
-        message: `任务 ${taskId} · 完成后在灵感池查看`,
+        message: `任务 ${taskId} · 完成后在灵感池 md 查看`,
       });
       setTimeout(() => popToRoot(), 400);
     } catch (err) {
@@ -73,13 +86,30 @@ export default function Command() {
         </ActionPanel>
       }
     >
-      <Form.Description text="粘贴单条视频链接（抖音 / 小红书 / B 站 / YouTube） → 自动下载转录 → 存到你配置的灵感池" />
+      <Form.Description text="粘贴单条视频链接（抖音 / 小红书 / B 站 / YouTube / 视频号 / 新片场）" />
       <Form.TextField
         id="url"
         title="视频链接"
         placeholder="https://v.douyin.com/..."
         error={urlError}
         onChange={() => urlError && setUrlError(undefined)}
+      />
+      <Form.Dropdown id="language" title="转录语言" defaultValue="zh">
+        <Form.Dropdown.Item value="zh" title="中文" />
+        <Form.Dropdown.Item value="en" title="英文" />
+        <Form.Dropdown.Item value="auto" title="自动检测" />
+      </Form.Dropdown>
+      <Form.TextArea
+        id="note"
+        title="备注（可选）"
+        placeholder="为什么收藏这条？关注什么点？"
+      />
+      <Form.Separator />
+      <Form.Checkbox
+        id="keepMedia"
+        label="保留视频文件到本地"
+        defaultValue={false}
+        info="默认关：转录完自动删除下载的视频，只留文案。勾上：视频保留在 /tmp/xgz_insp_*/"
       />
     </Form>
   );
