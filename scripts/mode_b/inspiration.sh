@@ -36,7 +36,12 @@ done
 [[ -z "$TARGET_DIR" ]] && { echo "ERROR: 无法确定目标目录" >&2; exit 1; }
 
 LOG_FILE="$HOME/.xugongzi-toolkit/logs/$TASK_ID.log"
-log()  { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
+# 写两份：log 文件带时间戳；stderr 带 INFO: 前缀供 Raycast Extension 实时读取
+log() {
+    local msg="$*"
+    echo "[$(date '+%H:%M:%S')] $msg" >> "$LOG_FILE"
+    echo "INFO: $msg" >&2
+}
 fail() { log "ERROR: $*"; bash "$TASK_LOG" update "$TASK_ID" failed "-"; exit 1; }
 
 trap 'fail "脚本异常退出"' ERR
@@ -151,3 +156,7 @@ else
 fi
 trap - ERR
 log "任务完成"
+# stdout 输出结果供 Raycast Extension 解析
+echo "OUT_FILE:$OUT_FILE"
+echo "METHOD:$METHOD"
+echo "TITLE:$TITLE"

@@ -393,19 +393,35 @@ function ConfirmView({
         extraArgs.push("--audio-only");
       }
 
-      launchBackground("bash", [
-        accountScript(cfg.mode),
-        "download",
-        listJsonPath,
-        taskId,
-        cfg.account_dir,
-        ...extraArgs,
-      ]);
+      // wrapper bash：开始前/完成后用 osascript 发系统通知（跟原版 wenan-extractor 一致）
+      const wrapperBash = `
+#!/bin/bash
+set +e
+osascript -e "display notification \\"开始下载 $XGZ_COUNT 条视频...\\" with title \\"🎬 抓整个号\\"" || true
+
+bash "$XGZ_SCRIPT" download "$XGZ_LIST" "$XGZ_TASK" "$XGZ_DIR" "$@"
+CODE=$?
+
+if [ $CODE -eq 0 ]; then
+  osascript -e "display notification \\"✅ $XGZ_ACCOUNT · $XGZ_COUNT 条已归档\\" with title \\"🎉 抓整个号 完成\\" sound name \\"Glass\\"" || true
+else
+  osascript -e "display notification \\"下载/归档失败（部分可能已完成）\\" with title \\"❌ 抓整个号 失败\\" sound name \\"Basso\\"" || true
+fi
+exit $CODE
+      `;
+      launchBackgroundWrapped(wrapperBash, extraArgs, {
+        XGZ_SCRIPT: accountScript(cfg.mode),
+        XGZ_LIST: listJsonPath,
+        XGZ_TASK: taskId,
+        XGZ_DIR: cfg.account_dir,
+        XGZ_ACCOUNT: safeAccount,
+        XGZ_COUNT: String(selected.length),
+      });
 
       await showToast({
         style: Toast.Style.Success,
         title: "✅ 已交给后台处理",
-        message: `${selected.length} 条 · 归档到 ${path.basename(targetDir)}/ · 用「任务状态」看进度`,
+        message: `${selected.length} 条 · 归档到 ${path.basename(targetDir)}/ · 完成后会弹系统通知`,
       });
 
       setTimeout(() => popToRoot(), 400);
@@ -544,6 +560,24 @@ function launchBackground(cmd: string, args: string[]): void {
     stdio: "ignore",
     env: { ...process.env, PATH: fullPath() },
   });
+  child.unref();
+}
+
+/** 把一段 bash 脚本放后台跑，环境变量通过 env 传（避免字符串拼接注入） */
+function launchBackgroundWrapped(
+  bashScript: string,
+  positionalArgs: string[],
+  extraEnv: Record<string, string>,
+): void {
+  const child = spawn(
+    "bash",
+    ["-c", bashScript, "--", ...positionalArgs],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, PATH: fullPath(), ...extraEnv },
+    },
+  );
   child.unref();
 }
 
